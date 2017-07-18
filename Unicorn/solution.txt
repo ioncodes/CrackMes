@@ -1,0 +1,122 @@
+Let's open in up in radare2.
+
+$ radare2 Unicorn.app/Contents/MacOS/Unicorn
+
+Now let's examine the functions.
+
+$ afl
+
+0x000029b8    3 64           entry0
+0x000029f8    1 20           sym.dyld_stub_binding_helper
+0x00002a0c    1 14           sym.__dyld_func_lookup
+0x00002a1a    1 9            sym._main
+0x00002a23    1 5            sym.__UnicornAppDelegate_applicationDidFinishLaunching:_
+0x00002a28    1 11           sym.__UnicornAppDelegate_window_
+0x00002a33    1 14           sym.__UnicornAppDelegate_setWindow:_
+0x00002a41    1 128          sym.__UnicornAppDelegate_validateSerial:forName:_
+0x00002ac1    1 47           sym.__UnicornAppDelegate_awakeFromNib_
+0x00002af0    4 181          sym.__UnicornAppDelegate_validate:_
+0x00002ba5    1 60           sym.__NSString_CocoaCryptoHashing__md5HexHash_
+0x00002be1    5 211          sym.__NSData_CocoaCryptoHashing__md5HexHash_
+0x00002cb4    1 6            sym.imp.CC_MD5
+0x00002cba    1 6            sym.imp.NSApplicationMain
+0x00002cc0    1 6            sym.imp.NSRunAlertPanel
+0x00002cc6    1 6            sym.imp.__stack_chk_fail
+0x00002ccc    1 6            sym.imp.exit
+0x00002cd2    1 6            sym.imp.objc_msgSend
+0x00002cd8    1 6            sym.imp.sprintf
+0x00002cde    3 36           sym._stub_helpers
+
+You can safely ignore all except the ones called sym.__UnicornAppDelegate_*
+
+0x00002a23    1 5            sym.__UnicornAppDelegate_applicationDidFinishLaunching:_
+0x00002a28    1 11           sym.__UnicornAppDelegate_window_
+0x00002a33    1 14           sym.__UnicornAppDelegate_setWindow:_
+0x00002a41    1 128          sym.__UnicornAppDelegate_validateSerial:forName:_
+0x00002ac1    1 47           sym.__UnicornAppDelegate_awakeFromNib_
+0x00002af0    4 181          sym.__UnicornAppDelegate_validate:_
+
+If we start from the top, the first interesting function is this one:
+
+0x00002a41    1 128          sym.__UnicornAppDelegate_validateSerial:forName:_
+
+Let's jump to that position:
+
+$ s 0x00002a41
+
+We know that we just jumped to the start of a function, which means that we can use the pdf command of radare2 to analyze the whole function.
+
+$ pdf
+
+Gives us this:
+
+/ (fcn) sym.__UnicornAppDelegate_validateSerial:forName:_ 128
+|   sym.__UnicornAppDelegate_validateSerial:forName:_ (int arg_10h, int arg_14h);
+|           ; arg int arg_10h @ ebp+0x10
+|           ; arg int arg_14h @ ebp+0x14
+|           ; var int local_4h @ esp+0x4
+|           ; var int local_8h @ esp+0x8
+|           0x00002a41      55             push ebp
+|           0x00002a42      89e5           mov ebp, esp
+|           0x00002a44      83ec18         sub esp, 0x18
+|           0x00002a47      c74424084430.  mov dword [local_8h], reloc.__CFConstantStringClassReference_68 ; [0x3044:4]=0
+|           0x00002a4f      a110400000     mov eax, dword [0x4010]     ; [0x4010:4]=0x2eeb "stringByAppendingString:"
+|           0x00002a54      89442404       mov dword [local_4h], eax
+|           0x00002a58      8b4514         mov eax, dword [arg_14h]    ; [0x14:4]=0x4470000
+|           0x00002a5b      890424         mov dword [esp], eax
+|           0x00002a5e      e86f020000     call sym.imp.objc_msgSend   ; void *objc_msgSend(void *instance, char *selector)
+|           0x00002a63      8b150c400000   mov edx, dword [0x400c]     ; [0x400c:4]=0x2ee0 "md5HexHash"
+|           0x00002a69      89542404       mov dword [local_4h], edx
+|           0x00002a6d      890424         mov dword [esp], eax
+|           0x00002a70      e85d020000     call sym.imp.objc_msgSend   ; void *objc_msgSend(void *instance, char *selector)
+|           0x00002a75      8b1508400000   mov edx, dword [0x4008]     ; [0x4008:4]=0x2ed0 "uppercaseString"
+|           0x00002a7b      89542404       mov dword [local_4h], edx
+|           0x00002a7f      890424         mov dword [esp], eax
+|           0x00002a82      e84b020000     call sym.imp.objc_msgSend   ; void *objc_msgSend(void *instance, char *selector)
+|           0x00002a87      c74424081400.  mov dword [local_8h], 0x14  ; [0x14:4]=0x4470000
+|           0x00002a8f      8b1504400000   mov edx, dword [0x4004]     ; [0x4004:4]=0x2ebe "substringToIndex:"
+|           0x00002a95      89542404       mov dword [local_4h], edx
+|           0x00002a99      890424         mov dword [esp], eax
+|           0x00002a9c      e831020000     call sym.imp.objc_msgSend   ; void *objc_msgSend(void *instance, char *selector)
+|           0x00002aa1      8b5510         mov edx, dword [arg_10h]    ; [0x10:4]=0x100000
+|           0x00002aa4      89542408       mov dword [local_8h], edx
+|           0x00002aa8      8b1500400000   mov edx, dword [0x4000]     ; section.10.__OBJC.__message_refs ; [0x4000:4]=0x2ead "isEqualToString:"
+|           0x00002aae      89542404       mov dword [local_4h], edx
+|           0x00002ab2      890424         mov dword [esp], eax
+|           0x00002ab5      e818020000     call sym.imp.objc_msgSend   ; void *objc_msgSend(void *instance, char *selector)
+|           0x00002aba      84c0           test al, al
+|           0x00002abc      0f95c0         setne al
+|           0x00002abf      c9             leave
+\           0x00002ac0      c3             ret
+
+If we look closely we can see calls:
+
+stringByAppendingString:
+md5HexHash
+uppercaseString
+substringToIndex:
+
+Do we need to know more? Look closely. We only need to know the string that get's appended by the first call.
+
+You can see that it reads a value from address 0x3044. But let's think logically. This crackme is so easy that the value cant be that hard to spot so let's just dump all strings.
+
+$ izz
+
+Look for the region where you find common UI strings, such as Error!, etc. You should come up with this:
+
+vaddr=0x00001d72 paddr=0x00001d72 ordinal=064 sz=9 len=8 section=unknown type=ascii string=+unicorn
+vaddr=0x00001d7b paddr=0x00001d7b ordinal=065 sz=10 len=9 section=unknown type=ascii string=Try again
+vaddr=0x00001d85 paddr=0x00001d85 ordinal=066 sz=25 len=24 section=unknown type=ascii string=The serial is not valid.
+vaddr=0x00001d9e paddr=0x00001d9e ordinal=067 sz=7 len=6 section=unknown type=ascii string=Error!
+vaddr=0x00001da8 paddr=0x00001da8 ordinal=068 sz=21 len=20 section=unknown type=ascii string=The serial is valid.
+vaddr=0x00001dbd paddr=0x00001dbd ordinal=069 sz=9 len=8 section=unknown type=ascii string=Success!
+
+Now guess... Yeah, it's "+unicorn".
+
+As for the function called substringToIndex:; The index to substring is 0x14 which is 20. This means: Get all chars from 0 to 20.
+
+So what it does is:
+
+USERNAME.append("+unicorn").md5().toUpper().substring(0, 20);
+
+Have a look at keygen.js, which is written in NodeJS.
